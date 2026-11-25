@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DepthForge 3D — Depth Map, Relief &amp; Displacement Studio</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Three.js Core + OrbitControls + RoomEnvironment (r128) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #060a12;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Dark studio scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(13, 20, 36, 0.55);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.65);
+    }
+
+    /* Tactile range sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(148, 163, 184, 0.22);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
+      transition: transform 0.14s ease, background-color 0.14s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.14);
+      background: #7dd3fc;
+    }
+
+    .checkerboard {
+      background-color: #090e1a;
+      background-image:
+        linear-gradient(45deg, #131d33 25%, transparent 25%),
+        linear-gradient(-45deg, #131d33 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #131d33 75%),
+        linear-gradient(-45deg, transparent 75%, #131d33 75%);
+      background-size: 10px 10px;
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden select-none bg-[#060a12] text-slate-100">
+
+  <!-- TOP STUDIO BAR -->
+  <header class="h-13 px-3.5 sm:px-5 py-2 flex items-center justify-between border-b border-slate-800/90 bg-slate-950/95 z-30 shrink-0">
+    <div class="flex items-center gap-2.5 sm:gap-3">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 via-cyan-300 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
+        <i class="fa-solid fa-mountain-sun text-slate-950 text-sm"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold tracking-tight text-sm sm:text-base text-white">
+            DepthForge <span class="text-sky-400">3D</span>
+          </h1>
+          <span class="hidden md:inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/30">
+            Depth · Relief · Displacement
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2">
+      <button id="btnExportOBJTop" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-sky-300 flex items-center gap-1.5 transition" title="Download Wavefront .OBJ">
+        <i class="fa-solid fa-cube text-[11px]"></i>
+        <span class="hidden sm:inline">.OBJ</span>
+      </button>
+      <button id="btnExportGLBTop" class="px-2.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-xs font-semibold text-sky-200 flex items-center gap-1.5 transition" title="Download Binary glTF 2.0 .GLB">
+        <i class="fa-solid fa-shapes text-[11px]"></i>
+        <span class="hidden sm:inline">.GLB</span>
+      </button>
+      <button id="btnExportSTLTop" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-xs font-semibold text-emerald-300 flex items-center gap-1.5 transition" title="Download Binary .STL">
+        <i class="fa-solid fa-print text-[11px]"></i>
+        <span class="hidden sm:inline">.STL</span>
+      </button>
+      <button id="btnToggleRailMobile" class="lg:hidden px-3 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/40 text-xs font-semibold text-sky-300 flex items-center gap-1.5">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Controls</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+
+    <!-- LEFT COLLAPSIBLE CONTROL RAIL -->
+    <aside id="leftControlRail" class="fixed lg:static inset-y-12 left-0 w-full sm:w-[390px] lg:w-[405px] h-[calc(100vh-3rem)] bg-slate-950/95 backdrop-blur-xl border-r border-slate-800 z-30 flex flex-col overflow-hidden transition-all duration-300 -translate-x-full lg:translate-x-0 shrink-0">
+
+      <div class="px-4 py-3 border-b border-slate-800/90 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-sky-400 text-xs"></i>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-white">Relief &amp; Displacement Rail</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnResetParams" class="text-[11px] text-sky-400 hover:text-sky-300 font-medium">Reset</button>
+          <button id="btnCollapseRailDesktop" class="hidden lg:inline-flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Collapse Control Rail">
+            <i class="fa-solid fa-angles-left text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+
+        <!-- 1. SOURCE IMAGE & PROCEDURAL PATTERNS -->
+        <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">1. Source &amp; Procedural Patterns</span>
+            <span id="sourceBadge" class="text-[10px] font-mono text-sky-300 truncate max-w-[140px]">Medallion Crest</span>
+          </div>
+
+          <label class="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-700 hover:border-sky-400/70 bg-slate-950/65 py-2.5 px-3 text-xs font-medium text-slate-300 hover:text-sky-300 cursor-pointer transition">
+            <input id="imageFileInput" type="file" accept="image/*" class="hidden" />
+            <i class="fa-solid fa-cloud-arrow-up text-sky-400"></i>
+            <span>Upload Photo (PNG, JPG, WEBP)</span>
+          </label>
+
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="medallion" class="preset-btn active py-2 px-2.5 rounded-xl text-[11px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-crown text-[10px]"></i>
+              <span>Medallion Crest</span>
+            </button>
+            <button data-preset="alpine" class="preset-btn py-2 px-2.5 rounded-xl text-[11px] font-medium bg-slate-950/70 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-mountain text-[10px]"></i>
+              <span>Alpine Terrain</span>
+            </button>
+            <button data-preset="geometric" class="preset-btn py-2 px-2.5 rounded-xl text-[11px] font-medium bg-slate-950/70 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-shapes text-[10px]"></i>
+              <span>Geometric Relief</span>
+            </button>
+            <button data-preset="botanical" class="preset-btn py-2 px-2.5 rounded-xl text-[11px] font-medium bg-slate-950/70 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-leaf text-[10px]"></i>
+              <span>Botanical Emboss</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 2. DEPTH MAP & RELIEF MODE -->
+        <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">2. Depth Source / Mode</span>
+            <span class="text-[10px] font-mono text-emerald-400">DEPTH SOLVER</span>
+          </div>
+
+          <select id="selectDepthMode" class="w-full rounded-xl bg-slate-950 border border-slate-700/90 px-3 py-2 text-xs font-medium text-slate-100 focus:outline-none focus:border-sky-400">
+            <option value="luminanceEdge" selected>Luminance + Edge Relief</option>
+            <option value="centerDome">Center Radial Dome</option>
+            <option value="edgeEmboss">Edge Emboss</option>
+            <option value="luminanceOnly">Luminance Only</option>
+          </select>
+
+          <div class="flex items-center justify-between pt-1">
+            <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input id="toggleInvertDepth" type="checkbox" class="accent-sky-400 rounded" />
+              <span>Invert Depth</span>
+            </label>
+            <span class="text-[10px] font-mono text-slate-400">Watertight Back + Walls</span>
+          </div>
+        </section>
+
+        <!-- 3. DISPLACEMENT, PLINTH & MESH CONTROLS -->
+        <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">3. Relief &amp; Mesh Parameters</span>
+            <span class="text-[10px] font-mono text-sky-300">REAL-TIME</span>
+          </div>
+
+          <div class="space-y-2.5 text-xs">
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Relief Displacement Scale</span>
+                <span id="valReliefScale" class="font-mono text-sky-300">0.55</span>
+              </div>
+              <input id="sliderReliefScale" type="range" min="0.05" max="1.40" step="0.01" value="0.55" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Base / Plinth Thickness</span>
+                <span id="valPlinth" class="font-mono text-sky-300">0.22</span>
+              </div>
+              <input id="sliderPlinth" type="range" min="0.02" max="0.80" step="0.01" value="0.22" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Mesh Resolution (Grid Segments)</span>
+                <span id="valSegments" class="font-mono text-emerald-300">144</span>
+              </div>
+              <input id="sliderSegments" type="range" min="64" max="240" step="4" value="144" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Smoothing / Blur Radius</span>
+                <span id="valBlur" class="font-mono text-sky-300">1.5</span>
+              </div>
+              <input id="sliderBlur" type="range" min="0" max="8" step="0.5" value="1.5" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Contrast</span>
+                <span id="valContrast" class="font-mono text-sky-300">1.15</span>
+              </div>
+              <input id="sliderContrast" type="range" min="0.4" max="2.2" step="0.05" value="1.15" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-slate-300">Gamma</span>
+                <span id="valGamma" class="font-mono text-sky-300">1.00</span>
+              </div>
+              <input id="sliderGamma" type="range" min="0.35" max="2.50" step="0.05" value="1.00" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. DIRECT 3D MODEL EXPORTERS -->
+        <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200">4. Export Watertight 3D Model</span>
+            <span class="text-[10px] font-mono text-amber-300">SOLID MESH</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btnExportOBJ" class="py-2.5 px-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-lg shadow-sky-500/20 transition">
+              <i class="fa-solid fa-cube text-sm"></i>
+              <span>.OBJ</span>
+            </button>
+            <button id="btnExportGLB" class="py-2.5 px-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-lg shadow-indigo-500/20 transition">
+              <i class="fa-solid fa-shapes text-sm"></i>
+              <span>.GLB</span>
+            </button>
+            <button id="btnExportSTL" class="py-2.5 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 transition">
+              <i class="fa-solid fa-print text-sm"></i>
+              <span>.STL</span>
+            </button>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- RIGHT WORKSPACE: VIEWPORT + SIDE-BY-SIDE SOURCE & DEPTH PREVIEW STRIP -->
+    <main id="dropZoneMain" class="flex-1 h-full w-full flex flex-col bg-[#060a12] overflow-hidden relative">
+
+      <!-- Drag & Drop Overlay -->
+      <div id="dragOverlay" class="hidden absolute inset-0 z-40 bg-sky-950/80 backdrop-blur-md border-2 border-dashed border-sky-400 m-3 rounded-2xl flex flex-col items-center justify-center text-center pointer-events-none">
+        <div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-400/50 flex items-center justify-center text-sky-300 text-2xl mb-3">
+          <i class="fa-solid fa-image"></i>
+        </div>
+        <p class="text-sm font-bold text-white">Drop Image to Generate Relief &amp; 3D Mesh</p>
+        <p class="text-xs text-sky-200/80 mt-1">Supports PNG, JPG, and WEBP</p>
+      </div>
+
+      <!-- Floating Expand Rail Button (when collapsed on desktop) -->
+      <button id="btnExpandRailDesktop" class="hidden fixed top-16 left-3 z-20 px-3 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 border border-sky-500/40 text-xs font-semibold text-sky-300 shadow-xl items-center gap-1.5 transition">
+        <i class="fa-solid fa-angles-right"></i>
+        <span>Controls</span>
+      </button>
+
+      <!-- THREE.JS WEBGL VIEWPORT -->
+      <div class="relative flex-1 min-h-0 w-full overflow-hidden">
+
+        <!-- Viewport Top Bar: View Modes, Grid Toggle, Reset Camera -->
+        <div class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+
+          <div class="pointer-events-auto flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80 shadow-xl">
+            <button data-viewmode="textured" class="viewmode-btn active px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-palette text-[11px]"></i>
+              <span>Photo Textured</span>
+            </button>
+            <button data-viewmode="heatmap" class="viewmode-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-temperature-high text-[11px]"></i>
+              <span>Depth Heatmap</span>
+            </button>
+            <button data-viewmode="clay" class="viewmode-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-circle text-[11px]"></i>
+              <span>Clay Matte</span>
+            </button>
+            <button data-viewmode="wireframe" class="viewmode-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-border-all text-[11px]"></i>
+              <span>Wireframe</span>
+            </button>
+          </div>
+
+          <div class="pointer-events-auto flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80 shadow-xl">
+            <button id="btnToggleGrid" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="Toggle Studio Floor Grid">
+              <i class="fa-solid fa-border-none text-sky-400"></i>
+              <span class="hidden sm:inline">Grid</span>
+            </button>
+            <button id="btnResetCamera" class="p-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition" title="Reset Camera">
+              <i class="fa-solid fa-crosshairs"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Three.js Canvas Container -->
+        <div id="threeCanvasHost" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Bottom-Left Mesh Telemetry Pill -->
+        <div class="absolute bottom-3 left-3 z-20 flex flex-wrap items-center gap-3 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/80 shadow-xl text-[11px] font-mono pointer-events-none">
+          <span>VERTS: <strong id="statVerts" class="text-sky-300">0</strong></span>
+          <span>TRIS: <strong id="statTris" class="text-emerald-300">0</strong></span>
+          <span>BOUNDS: <strong id="statBounds" class="text-amber-300">0.00×0.00×0.00</strong></span>
+        </div>
+      </div>
+
+      <!-- SIDE-BY-SIDE SOURCE & DEPTH MAP PREVIEW STRIP -->
+      <section class="h-36 sm:h-40 border-t border-slate-800/90 bg-slate-950/95 px-3.5 sm:px-5 py-2.5 flex items-center gap-3 sm:gap-5 shrink-0 z-20">
+        <div class="flex-1 h-full rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2 flex items-center gap-3 overflow-hidden">
+          <div class="w-24 sm:w-28 h-full rounded-lg checkerboard border border-slate-700/80 overflow-hidden flex items-center justify-center shrink-0">
+            <canvas id="canvasSourcePreview" class="max-w-full max-h-full object-contain"></canvas>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-sky-300">Source Image</div>
+            <div id="sourceDimsLabel" class="text-[11px] font-mono text-slate-400 mt-0.5">256 × 256 px</div>
+            <p class="text-[11px] text-slate-400 hidden sm:block mt-1">Drives albedo color, luminance, and relief structure.</p>
+          </div>
+        </div>
+
+        <div class="flex-1 h-full rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2 flex items-center gap-3 overflow-hidden">
+          <div class="w-24 sm:w-28 h-full rounded-lg checkerboard border border-slate-700/80 overflow-hidden flex items-center justify-center shrink-0">
+            <canvas id="canvasDepthPreview" class="max-w-full max-h-full object-contain"></canvas>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Generated Depth Map</div>
+            <div id="depthModeLabel" class="text-[11px] font-mono text-slate-400 mt-0.5">Luminance + Edge Relief</div>
+            <p class="text-[11px] text-slate-400 hidden sm:block mt-1">Bright values extrude forward (+Z); dark values recess.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-44 sm:bottom-48 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. APPLICATION STATE & CONSTANTS
+      // =========================================================================
+      const MAP_RES = 256;
+      const MESH_WIDTH = 2.0;
+      const MESH_HEIGHT = 2.0;
+
+      const DEPTH_MODE_LABELS = {
+        luminanceEdge: 'Luminance + Edge Relief',
+        centerDome: 'Center Radial Dome',
+        edgeEmboss: 'Edge Emboss',
+        luminanceOnly: 'Luminance Only'
+      };
+
+      const PRESET_LABELS = {
+        medallion: 'Medallion Crest',
+        alpine: 'Alpine Terrain',
+        geometric: 'Geometric Relief',
+        botanical: 'Botanical Emboss'
+      };
+
+      const STATE = {
+        preset: 'medallion',
+        sourceName: 'Medallion Crest',
+        sourceWidth: MAP_RES,
+        sourceHeight: MAP_RES,
+        depthMode: 'luminanceEdge',
+        invertDepth: false,
+        reliefScale: 0.55,
+        plinthThickness: 0.22,
+        segments: 144,
+        blurRadius: 1.5,
+        contrast: 1.15,
+        gamma: 1.0,
+        viewMode: 'textured', // 'textured' | 'heatmap' | 'clay' | 'wireframe'
+        showGrid: true,
+        railCollapsed: false,
+        sourceRGBA: null,    // Uint8ClampedArray (MAP_RES * MAP_RES * 4)
+        depthField: null,    // Float32Array (MAP_RES * MAP_RES) in [0..1]
+        activeGeometry: null,
+        activeTexture: null,
+        activeObjectURLs: new Set()
+      };
+
+      const DOM = {
+        leftControlRail: document.getElementById('leftControlRail'),
+        btnExpandRailDesktop: document.getElementById('btnExpandRailDesktop'),
+        dragOverlay: document.getElementById('dragOverlay'),
+        threeCanvasHost: document.getElementById('threeCanvasHost'),
+        canvasSourcePreview: document.getElementById('canvasSourcePreview'),
+        canvasDepthPreview: document.getElementById('canvasDepthPreview'),
+        sourceBadge: document.getElementById('sourceBadge'),
+        sourceDimsLabel: document.getElementById('sourceDimsLabel'),
+        depthModeLabel: document.getElementById('depthModeLabel'),
+        statVerts: document.getElementById('statVerts'),
+        statTris: document.getElementById('statTris'),
+        statBounds: document.getElementById('statBounds'),
+        toastContainer: document.getElementById('toastContainer'),
+        imageFileInput: document.getElementById('imageFileInput'),
+        selectDepthMode: document.getElementById('selectDepthMode'),
+        toggleInvertDepth: document.getElementById('toggleInvertDepth'),
+        sliderReliefScale: document.getElementById('sliderReliefScale'),
+        valReliefScale: document.getElementById('valReliefScale'),
+        sliderPlinth: document.getElementById('sliderPlinth'),
+        valPlinth: document.getElementById('valPlinth'),
+        sliderSegments: document.getElementById('sliderSegments'),
+        valSegments: document.getElementById('valSegments'),
+        sliderBlur: document.getElementById('sliderBlur'),
+        valBlur: document.getElementById('valBlur'),
+        sliderContrast: document.getElementById('sliderContrast'),
+        valContrast: document.getElementById('valContrast'),
+        sliderGamma: document.getElementById('sliderGamma'),
+        valGamma: document.getElementById('valGamma')
+      };
+
+      // Offscreen source canvas used for pattern generation and uploaded image rasterization
+      const workCanvas = document.createElement('canvas');
+      workCanvas.width = MAP_RES;
+      workCanvas.height = MAP_RES;
+      const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+      // =========================================================================
+      // 2. TOAST & DOWNLOAD HELPERS
+      // =========================================================================
+      function showToast(message, tone = 'info') {
+        const palettes = {
+          info: 'border-sky-500/40 bg-slate-900/95 text-sky-200',
+          success: 'border-emerald-500/40 bg-slate-900/95 text-emerald-200',
+          warning: 'border-amber-500/40 bg-slate-900/95 text-amber-200',
+          error: 'border-rose-500/40 bg-slate-900/95 text-rose-200'
+        };
+        const icons = {
+          info: 'fa-circle-info text-sky-400',
+          success: 'fa-circle-check text-emerald-400',
+          warning: 'fa-triangle-exclamation text-amber-400',
+          error: 'fa-circle-xmark text-rose-400'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto flex items-center gap-2 px-3.5 py-2.5 rounded-xl border shadow-2xl backdrop-blur-md text-xs font-medium transition-all duration-300 translate-y-2 opacity-0 ${palettes[tone] || palettes.info}`;
+        toast.innerHTML = `<i class="fa-solid ${icons[tone] || icons.info}"></i><span>${message}</span>`;
+        DOM.toastContainer.appendChild(toast);
+
+        requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => toast.remove(), 250);
+        }, 2800);
+      }
+
+      function downloadBlob(filename, blob) {
+        try {
+          const url = URL.createObjectURL(blob);
+          STATE.activeObjectURLs.add(url);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+            STATE.activeObjectURLs.delete(url);
+          }, 5000);
+        } catch (err) {
+          showToast(`Download failed: ${err.message}`, 'error');
+        }
+      }
+
+      // =========================================================================
+      // 3. PROCEDURAL PATTERNS & IMAGE LOADING
+      // =========================================================================
+      function renderProceduralPreset(presetName) {
+        const w = MAP_RES;
+        const h = MAP_RES;
+        workCtx.clearRect(0, 0, w, h);
+
+        if (presetName === 'medallion') {
+          const grad = workCtx.createRadialGradient(w * 0.5, h * 0.5, 10, w * 0.5, h * 0.5, w * 0.52);
+          grad.addColorStop(0, '#f8fafc');
+          grad.addColorStop(0.55, '#94a3b8');
+          grad.addColorStop(0.85, '#334155');
+          grad.addColorStop(1, '#0f172a');
+          workCtx.fillStyle = grad;
+          workCtx.fillRect(0, 0, w, h);
+
+          const cx = w * 0.5;
+          const cy = h * 0.5;
+
+          // Outer embossed ring & notches
+          workCtx.strokeStyle = '#e2e8f0';
+          workCtx.lineWidth = 10;
+          workCtx.beginPath();
+          workCtx.arc(cx, cy, w * 0.39, 0, Math.PI * 2);
+          workCtx.stroke();
+
+          // Radial star / crest rays
+          const rays = 16;
+          for (let i = 0; i < rays; i++) {
+            const angle = (i / rays) * Math.PI * 2;
+            const innerR = w * 0.14;
+            const outerR = i % 2 === 0 ? w * 0.35 : w * 0.27;
+            workCtx.fillStyle = i % 2 === 0 ? '#f1f5f9' : '#cbd5e1';
+            workCtx.beginPath();
+            workCtx.moveTo(cx + Math.cos(angle - 0.11) * innerR, cy + Math.sin(angle - 0.11) * innerR);
+            workCtx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
+            workCtx.lineTo(cx + Math.cos(angle + 0.11) * innerR, cy + Math.sin(angle + 0.11) * innerR);
+            workCtx.closePath();
+            workCtx.fill();
+          }
+
+          // Central boss
+          const bossGrad = workCtx.createRadialGradient(cx - 10, cy - 10, 4, cx, cy, w * 0.15);
+          bossGrad.addColorStop(0, '#ffffff');
+          bossGrad.addColorStop(1, '#64748b');
+          workCtx.fillStyle = bossGrad;
+          workCtx.beginPath();
+          workCtx.arc(cx, cy, w * 0.14, 0, Math.PI * 2);
+          workCtx.fill();
+        } else if (presetName === 'alpine') {
+          const imgData = workCtx.createImageData(w, h);
+          const d = imgData.data;
+          for (let y = 0; y < h; y++) {
+            const ny = (y / h) * 2 - 1;
+            for (let x = 0; x < w; x++) {
+              const nx = (x / w) * 2 - 1;
+              // Multi-octave ridged mountain height
+              let ridge1 = 1.0 - Math.abs(Math.sin(nx * 3.8 + Math.cos(ny * 2.5) * 1.1));
+              ridge1 = Math.pow(Math.max(0, ridge1), 1.6);
+
+              let ridge2 = 1.0 - Math.abs(Math.cos(ny * 5.2 - Math.sin(nx * 4.4) * 0.9));
+              ridge2 = Math.pow(Math.max(0, ridge2), 1.8);
+
+              const falloff = Math.max(0, 1.0 - (nx * nx * 0.35 + ny * ny * 0.35));
+              const elev = Math.min(1, Math.max(0, (ridge1 * 0.6 + ridge2 * 0.4) * (0.45 + 0.65 * falloff)));
+
+              const idx = (y * w + x) * 4;
+              if (elev > 0.72) {
+                // Snow peak
+                const snow = Math.min(255, Math.round(215 + (elev - 0.72) * 140));
+                d[idx] = snow;
+                d[idx + 1] = Math.min(255, snow + 4);
+                d[idx + 2] = Math.min(255, snow + 10);
+              } else if (elev > 0.35) {
+                // Slate / granite rock
+                const rock = Math.round(65 + elev * 150);
+                d[idx] = rock;
+                d[idx + 1] = Math.round(rock * 0.98);
+                d[idx + 2] = Math.round(rock * 1.05);
+              } else {
+                // Deep valley / alpine basin
+                const val = Math.round(24 + elev * 130);
+                d[idx] = Math.round(val * 0.7);
+                d[idx + 1] = Math.round(val * 0.95);
+                d[idx + 2] = Math.round(val * 1.15);
+              }
+              d[idx + 3] = 255;
+            }
+          }
+          workCtx.putImageData(imgData, 0, 0);
+        } else if (presetName === 'geometric') {
+          workCtx.fillStyle = '#0f172a';
+          workCtx.fillRect(0, 0, w, h);
+
+          const cells = 8;
+          const cw = w / cells;
+          const ch = h / cells;
+          for (let gy = 0; gy < cells; gy++) {
+            for (let gx = 0; gx < cells; gx++) {
+              const x0 = gx * cw;
+              const y0 = gy * ch;
+              const distCenter = Math.hypot(gx - (cells - 1) * 0.5, gy - (cells - 1) * 0.5);
+              const shade = Math.max(50, Math.min(245, Math.round(235 - distCenter * 28)));
+
+              if ((gx + gy) % 2 === 0) {
+                workCtx.fillStyle = `rgb(${shade}, ${Math.min(255, shade + 12)}, 255)`;
+                workCtx.fillRect(x0 + 3, y0 + 3, cw - 6, ch - 6);
+
+                workCtx.fillStyle = `rgb(${Math.max(30, shade - 55)}, ${Math.max(40, shade - 40)}, ${Math.max(70, shade - 15)})`;
+                workCtx.beginPath();
+                workCtx.arc(x0 + cw * 0.5, y0 + ch * 0.5, cw * 0.28, 0, Math.PI * 2);
+                workCtx.fill();
+              } else {
+                workCtx.fillStyle = `rgb(${Math.max(25, shade - 70)}, ${Math.max(35, shade - 55)}, ${Math.max(55, shade - 30)})`;
+                workCtx.beginPath();
+                workCtx.moveTo(x0 + cw * 0.5, y0 + 4);
+                workCtx.lineTo(x0 + cw - 4, y0 + ch * 0.5);
+                workCtx.lineTo(x0 + cw * 0.5, y0 + ch - 4);
+                workCtx.lineTo(x0 + 4, y0 + ch * 0.5);
+                workCtx.closePath();
+                workCtx.fill();
+              }
+            }
+          }
+        } else {
+          // 'botanical' embossed leaf & stem relief
+          const bgGrad = workCtx.createLinearGradient(0, 0, w, h);
+          bgGrad.addColorStop(0, '#111827');
+          bgGrad.addColorStop(1, '#1e293b');
+          workCtx.fillStyle = bgGrad;
+          workCtx.fillRect(0, 0, w, h);
+
+          const cx = w * 0.5;
+          const cy = h * 0.5;
+
+          // Central stem
+          workCtx.strokeStyle = '#cbd5e1';
+          workCtx.lineWidth = 8;
+          workCtx.lineCap = 'round';
+          workCtx.beginPath();
+          workCtx.moveTo(cx * 0.65, h * 0.88);
+          workCtx.quadraticCurveTo(cx * 1.05, cy, cx * 1.32, h * 0.14);
+          workCtx.stroke();
+
+          // Pairs of embossed leaves along stem
+          const pairs = 5;
+          for (let i = 0; i < pairs; i++) {
+            const t = 0.22 + (i / pairs) * 0.58;
+            const sy = h * (0.86 - t * 0.7);
+            const sx = cx * (0.7 + t * 0.55);
+
+            [-1, 1].forEach((side) => {
+              const leafLen = 58 - i * 5;
+              const leafWid = 24 - i * 2;
+              const angle = side < 0 ? -Math.PI * 0.76 : -Math.PI * 0.24;
+
+              workCtx.save();
+              workCtx.translate(sx, sy);
+              workCtx.rotate(angle);
+
+              const lGrad = workCtx.createLinearGradient(0, -leafWid, 0, leafWid);
+              lGrad.addColorStop(0, '#64748b');
+              lGrad.addColorStop(0.5, '#f8fafc');
+              lGrad.addColorStop(1, '#475569');
+
+              workCtx.fillStyle = lGrad;
+              workCtx.beginPath();
+              workCtx.moveTo(0, 0);
+              workCtx.quadraticCurveTo(leafLen * 0.55, -leafWid, leafLen, 0);
+              workCtx.quadraticCurveTo(leafLen * 0.55, leafWid, 0, 0);
+              workCtx.fill();
+
+              // Center vein groove
+              workCtx.strokeStyle = '#1e293b';
+              workCtx.lineWidth = 2;
+              workCtx.beginPath();
+              workCtx.moveTo(2, 0);
+              workCtx.lineTo(leafLen * 0.85, 0);
+              workCtx.stroke();
+
+              workCtx.restore();
+            });
+          }
+        }
+
+        STATE.sourceRGBA = new Uint8ClampedArray(workCtx.getImageData(0, 0, w, h).data);
+        STATE.sourceWidth = w;
+        STATE.sourceHeight = h;
+        STATE.sourceName = PRESET_LABELS[presetName] || presetName;
+        DOM.sourceBadge.textContent = STATE.sourceName;
+        DOM.sourceDimsLabel.textContent = `${w} × ${h} px (Procedural)`;
+      }
+
+      function handleUploadedImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+          showToast('Please upload a valid image file (PNG, JPG, WEBP).', 'warning');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onerror = () => showToast('Failed to read uploaded image file.', 'error');
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onerror = () => showToast('Could not decode image format.', 'error');
+          img.onload = () => {
+            const w = MAP_RES;
+            const h = MAP_RES;
+            workCtx.fillStyle = '#0f172a';
+            workCtx.fillRect(0, 0, w, h);
+
+            const scale = Math.min(w / img.width, h / img.height);
+            const dw = img.width * scale;
+            const dh = img.height * scale;
+            workCtx.drawImage(img, (w - dw) * 0.5, (h - dh) * 0.5, dw, dh);
+
+            STATE.sourceRGBA = new Uint8ClampedArray(workCtx.getImageData(0, 0, w, h).data);
+            STATE.sourceWidth = img.width;
+            STATE.sourceHeight = img.height;
+            STATE.sourceName = file.name;
+            DOM.sourceBadge.textContent = file.name;
+            DOM.sourceDimsLabel.textContent = `${img.width} × ${img.height} px`;
+
+            document.querySelectorAll('.preset-btn').forEach((b) => {
+              b.classList.remove('active', 'bg-sky-500/20', 'text-sky-300', 'border-sky-500/40', 'font-semibold');
+              b.classList.add('bg-slate-950/70', 'text-slate-300', 'border-slate-800', 'font-medium');
+            });
+
+            rebuildAll();
+            showToast(`Loaded "${file.name}" for relief & displacement`, 'success');
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // =========================================================================
+      // 4. DEPTH MAP SOLVER & PREVIEW CANVASES
+      // =========================================================================
+      function boxBlurField(src, width, height, radius) {
+        const r = Math.max(0, Math.round(radius));
+        if (r === 0) return new Float32Array(src);
+
+        const temp = new Float32Array(width * height);
+        const dst = new Float32Array(width * height);
+
+        // Horizontal pass
+        for (let y = 0; y < height; y++) {
+          const rowOffset = y * width;
+          for (let x = 0; x < width; x++) {
+            let sum = 0;
+            let count = 0;
+            const x0 = Math.max(0, x - r);
+            const x1 = Math.min(width - 1, x + r);
+            for (let kx = x0; kx <= x1; kx++) {
+              sum += src[rowOffset + kx];
+              count++;
+            }
+            temp[rowOffset + x] = sum / count;
+          }
+        }
+
+        // Vertical pass
+        for (let x = 0; x < width; x++) {
+          for (let y = 0; y < height; y++) {
+            let sum = 0;
+            let count = 0;
+            const y0 = Math.max(0, y - r);
+            const y1 = Math.min(height - 1, y + r);
+            for (let ky = y0; ky <= y1; ky++) {
+              sum += temp[ky * width + x];
+              count++;
+            }
+            dst[y * width + x] = sum / count;
+          }
+        }
+
+        return dst;
+      }
+
+      function computeDepthField() {
+        const w = MAP_RES;
+        const h = MAP_RES;
+        const rgba = STATE.sourceRGBA;
+        if (!rgba) return;
+
+        const lum = new Float32Array(w * h);
+        for (let i = 0; i < w * h; i++) {
+          const r = rgba[i * 4] / 255;
+          const g = rgba[i * 4 + 1] / 255;
+          const b = rgba[i * 4 + 2] / 255;
+          lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+
+        // Sobel edge magnitude
+        const edges = new Float32Array(w * h);
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const tl = lum[(y - 1) * w + (x - 1)];
+            const tc = lum[(y - 1) * w + x];
+            const tr = lum[(y - 1) * w + (x + 1)];
+            const ml = lum[y * w + (x - 1)];
+            const mr = lum[y * w + (x + 1)];
+            const bl = lum[(y + 1) * w + (x - 1)];
+            const bc = lum[(y + 1) * w + x];
+            const br = lum[(y + 1) * w + (x + 1)];
+
+            const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+            const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+            edges[y * w + x] = Math.min(1.0, Math.hypot(gx, gy) * 1.35);
+          }
+        }
+
+        const rawDepth = new Float32Array(w * h);
+        for (let y = 0; y < h; y++) {
+          const ny = (y / (h - 1)) * 2 - 1;
+          for (let x = 0; x < w; x++) {
+            const nx = (x / (w - 1)) * 2 - 1;
+            const idx = y * w + x;
+            const lVal = lum[idx];
+            const eVal = edges[idx];
+            const radial = Math.max(0, 1.0 - Math.min(1.0, Math.hypot(nx, ny) * 1.05));
+
+            let val;
+            if (STATE.depthMode === 'luminanceOnly') {
+              val = lVal;
+            } else if (STATE.depthMode === 'centerDome') {
+              val = radial * 0.72 + lVal * 0.28;
+            } else if (STATE.depthMode === 'edgeEmboss') {
+              val = eVal * 0.82 + lVal * 0.18;
+            } else {
+              // 'luminanceEdge'
+              val = lVal * 0.65 + eVal * 0.35;
+            }
+
+            // Contrast around 0.5
+            val = (val - 0.5) * STATE.contrast + 0.5;
+            val = Math.max(0.0, Math.min(1.0, val));
+
+            // Gamma curve
+            val = Math.pow(val, STATE.gamma);
+
+            if (STATE.invertDepth) {
+              val = 1.0 - val;
+            }
+
+            rawDepth[idx] = Math.max(0.0, Math.min(1.0, val));
+          }
+        }
+
+        STATE.depthField = boxBlurField(rawDepth, w, h, STATE.blurRadius);
+        DOM.depthModeLabel.textContent = DEPTH_MODE_LABELS[STATE.depthMode] || STATE.depthMode;
+      }
+
+      function renderPreviewCanvases() {
+        const w = MAP_RES;
+        const h = MAP_RES;
+
+        // Source preview
+        DOM.canvasSourcePreview.width = w;
+        DOM.canvasSourcePreview.height = h;
+        const srcCtx = DOM.canvasSourcePreview.getContext('2d');
+        if (STATE.sourceRGBA) {
+          srcCtx.putImageData(new ImageData(new Uint8ClampedArray(STATE.sourceRGBA), w, h), 0, 0);
+        }
+
+        // Depth map preview
+        DOM.canvasDepthPreview.width = w;
+        DOM.canvasDepthPreview.height = h;
+        const depthCtx = DOM.canvasDepthPreview.getContext('2d');
+        if (STATE.depthField) {
+          const out = depthCtx.createImageData(w, h);
+          for (let i = 0; i < w * h; i++) {
+            const g = Math.max(0, Math.min(255, Math.round(STATE.depthField[i] * 255)));
+            out.data[i * 4] = g;
+            out.data[i * 4 + 1] = g;
+            out.data[i * 4 + 2] = g;
+            out.data[i * 4 + 3] = 255;
+          }
+          depthCtx.putImageData(out, 0, 0);
+        }
+      }
+
+      function sampleDepthBilinear(u, v) {
+        if (!STATE.depthField) return 0;
+        const x = Math.max(0, Math.min(MAP_RES - 1.0001, u * (MAP_RES - 1)));
+        const y = Math.max(0, Math.min(MAP_RES - 1.0001, (1 - v) * (MAP_RES - 1)));
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const x1 = Math.min(MAP_RES - 1, x0 + 1);
+        const y1 = Math.min(MAP_RES - 1, y0 + 1);
+        const fx = x - x0;
+        const fy = y - y0;
+
+        const d00 = STATE.depthField[y0 * MAP_RES + x0];
+        const d10 = STATE.depthField[y0 * MAP_RES + x1];
+        const d01 = STATE.depthField[y1 * MAP_RES + x0];
+        const d11 = STATE.depthField[y1 * MAP_RES + x1];
+
+        const top = d00 * (1 - fx) + d10 * fx;
+        const bot = d01 * (1 - fx) + d11 * fx;
+        return top * (1 - fy) + bot * fy;
+      }
+
+      // =========================================================================
+      // 5. WATERTIGHT RELIEF & DISPLACEMENT GEOMETRY BUILDER
+      // =========================================================================
+      /**
+       * Builds a solid, watertight relief mesh with:
+       *  - Displaced front face (+Z) driven by the depth map & relief scale
+       *  - Flat/recessed back face (-Z plinth base)
+       *  - Four perimeter side walls stitching front and back edges
+       * Ensures outward-facing triangle winding and vertex colors for heatmap/clay modes.
+       */
+      function buildWatertightReliefGeometry() {
+        const segs = STATE.segments;
+        const cols = segs + 1;
+        const rows = segs + 1;
+        const gridVertCount = cols * rows;
+
+        const zBack = -STATE.plinthThickness;
+        const frontGridStart = 0;
+        const backGridStart = gridVertCount;
+
+        const positions = [];
+        const uvs = [];
+        const colors = [];
+        const indices = [];
+
+        const tempColor = new THREE.Color();
+
+        function heatmapColor(t, outColor) {
+          // 0.0 -> deep blue, 0.35 -> cyan, 0.65 -> yellow/amber, 1.0 -> bright coral/white
+          const clamped = Math.max(0, Math.min(1, t));
+          if (clamped < 0.33) {
+            const k = clamped / 0.33;
+            outColor.setRGB(0.08 * (1 - k) + 0.08 * k, 0.25 * (1 - k) + 0.78 * k, 0.85 * (1 - k) + 0.96 * k);
+          } else if (clamped < 0.68) {
+            const k = (clamped - 0.33) / 0.35;
+            outColor.setRGB(0.08 * (1 - k) + 0.98 * k, 0.78 * (1 - k) + 0.82 * k, 0.96 * (1 - k) + 0.18 * k);
+          } else {
+            const k = (clamped - 0.68) / 0.32;
+            outColor.setRGB(0.98 * (1 - k) + 1.0 * k, 0.82 * (1 - k) + 0.32 * k, 0.18 * (1 - k) + 0.45 * k);
+          }
+          return outColor;
+        }
+
+        // 1. Front displaced vertices (z = zBack + plinthThickness + d * reliefScale)
+        for (let r = 0; r < rows; r++) {
+          const v = r / segs;
+          const y = (v - 0.5) * MESH_HEIGHT;
+          for (let c = 0; c < cols; c++) {
+            const u = c / segs;
+            const x = (u - 0.5) * MESH_WIDTH;
+            const d = sampleDepthBilinear(u, v);
+            const z = zBack + STATE.plinthThickness + d * STATE.reliefScale;
+
+            positions.push(x, y, z);
+            uvs.push(u, v);
+
+            heatmapColor(d, tempColor);
+            colors.push(tempColor.r, tempColor.g, tempColor.b);
+          }
+        }
+
+        // 2. Back plinth vertices (z = zBack)
+        for (let r = 0; r < rows; r++) {
+          const v = r / segs;
+          const y = (v - 0.5) * MESH_HEIGHT;
+          for (let c = 0; c < cols; c++) {
+            const u = c / segs;
+            const x = (u - 0.5) * MESH_WIDTH;
+
+            positions.push(x, y, zBack);
+            uvs.push(u, v);
+            colors.push(0.16, 0.21, 0.30);
+          }
+        }
+
+        // 3. Front face triangles (counter-clockwise facing +Z)
+        for (let r = 0; r < segs; r++) {
+          for (let c = 0; c < segs; c++) {
+            const a = frontGridStart + r * cols + c;
+            const b = frontGridStart + r * cols + (c + 1);
+            const dIdx = frontGridStart + (r + 1) * cols + c;
+            const eIdx = frontGridStart + (r + 1) * cols + (c + 1);
+
+            indices.push(a, b, eIdx);
+            indices.push(a, eIdx, dIdx);
+          }
+        }
+
+        // 4. Back face triangles (winding reversed so normal points -Z)
+        for (let r = 0; r < segs; r++) {
+          for (let c = 0; c < segs; c++) {
+            const a = backGridStart + r * cols + c;
+            const b = backGridStart + r * cols + (c + 1);
+            const dIdx = backGridStart + (r + 1) * cols + c;
+            const eIdx = backGridStart + (r + 1) * cols + (c + 1);
+
+            indices.push(a, eIdx, b);
+            indices.push(a, dIdx, eIdx);
+          }
+        }
+
+        // 5. Four watertight side walls along perimeter (front edge <-> back edge)
+        // Bottom edge (r = 0, facing -Y)
+        for (let c = 0; c < segs; c++) {
+          const f0 = frontGridStart + c;
+          const f1 = frontGridStart + c + 1;
+          const b0 = backGridStart + c;
+          const b1 = backGridStart + c + 1;
+          indices.push(f0, b1, f1);
+          indices.push(f0, b0, b1);
+        }
+
+        // Top edge (r = segs, facing +Y)
+        const topRowOffset = segs * cols;
+        for (let c = 0; c < segs; c++) {
+          const f0 = frontGridStart + topRowOffset + c;
+          const f1 = frontGridStart + topRowOffset + c + 1;
+          const b0 = backGridStart + topRowOffset + c;
+          const b1 = backGridStart + topRowOffset + c + 1;
+          indices.push(f0, f1, b1);
+          indices.push(f0, b1, b0);
+        }
+
+        // Left edge (c = 0, facing -X)
+        for (let r = 0; r < segs; r++) {
+          const f0 = frontGridStart + r * cols;
+          const f1 = frontGridStart + (r + 1) * cols;
+          const b0 = backGridStart + r * cols;
+          const b1 = backGridStart + (r + 1) * cols;
+          indices.push(f0, f1, b1);
+          indices.push(f0, b1, b0);
+        }
+
+        // Right edge (c = segs, facing +X)
+        for (let r = 0; r < segs; r++) {
+          const f0 = frontGridStart + r * cols + segs;
+          const f1 = frontGridStart + (r + 1) * cols + segs;
+          const b0 = backGridStart + r * cols + segs;
+          const b1 = backGridStart + (r + 1) * cols + segs;
+          indices.push(f0, b1, f1);
+          indices.push(f0, b0, b1);
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        geo.computeBoundingBox();
+
+        return geo;
+      }
+
+      // =========================================================================
+      // 6. THREE.JS SCENE & MATERIAL MANAGEMENT
+      // =========================================================================
+      let scene, camera, renderer, controls, roomEnvRT, reliefMesh, gridHelper;
+
+      function initThreeViewport() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x060a12);
+        scene.fog = new THREE.FogExp2(0x060a12, 0.04);
+
+        const w = DOM.threeCanvasHost.clientWidth || window.innerWidth;
+        const h = DOM.threeCanvasHost.clientHeight || window.innerHeight;
+
+        camera = new THREE.PerspectiveCamera(44, w / h, 0.05, 100);
+        camera.position.set(1.85, 1.35, 2.75);
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          preserveDrawingBuffer: true,
+          powerPreference: 'high-performance'
+        });
+        renderer.setSize(w, h);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.12;
+        DOM.threeCanvasHost.appendChild(renderer.domElement);
+
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        const envScene = new THREE.RoomEnvironment();
+        roomEnvRT = pmrem.fromScene(envScene, 0.04);
+        envScene.dispose();
+        scene.environment = roomEnvRT.texture;
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.target.set(0, 0, 0.1);
+
+        scene.add(new THREE.AmbientLight(0xdbeafe, 0.45));
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+        keyLight.position.set(3.2, 4.2, 4.0);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.55);
+        fillLight.position.set(-3.0, -1.8, 2.2);
+        scene.add(fillLight);
+
+        gridHelper = new THREE.GridHelper(6.0, 20, 0x1e293b, 0x0d1526);
+        gridHelper.position.y = -1.25;
+        scene.add(gridHelper);
+
+        reliefMesh = new THREE.Mesh(new THREE.BufferGeometry(), createMaterialForViewMode('textured'));
+        scene.add(reliefMesh);
+
+        window.addEventListener('resize', onWindowResize);
+      }
+
+      function onWindowResize() {
+        const w = DOM.threeCanvasHost.clientWidth;
+        const h = DOM.threeCanvasHost.clientHeight;
+        if (!w || !h) return;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+
+      function syncSourceTexture() {
+        if (!STATE.sourceRGBA) return null;
+        if (STATE.activeTexture) {
+          STATE.activeTexture.dispose();
+          STATE.activeTexture = null;
+        }
+        const tex = new THREE.DataTexture(new Uint8Array(STATE.sourceRGBA), MAP_RES, MAP_RES, THREE.RGBAFormat);
+        tex.encoding = THREE.sRGBEncoding;
+        tex.needsUpdate = true;
+        STATE.activeTexture = tex;
+        return tex;
+      }
+
+      function createMaterialForViewMode(mode) {
+        if (mode === 'heatmap') {
+          return new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.42,
+            metalness: 0.12
+          });
+        }
+        if (mode === 'clay') {
+          return new THREE.MeshStandardMaterial({
+            color: 0xd6cfc7,
+            roughness: 0.78,
+            metalness: 0.04
+          });
+        }
+        if (mode === 'wireframe') {
+          return new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            wireframe: true
+          });
+        }
+        // 'textured'
+        return new THREE.MeshStandardMaterial({
+          map: STATE.activeTexture || null,
+          roughness: 0.52,
+          metalness: 0.08
+        });
+      }
+
+      function applyViewMode(mode) {
+        STATE.viewMode = mode;
+        if (!reliefMesh) return;
+        const oldMat = reliefMesh.material;
+        reliefMesh.material = createMaterialForViewMode(mode);
+        if (oldMat) oldMat.dispose();
+      }
+
+      function updateStatsDisplay(geo) {
+        const vCount = geo.attributes.position ? geo.attributes.position.count : 0;
+        const tCount = geo.index ? Math.floor(geo.index.count / 3) : Math.floor(vCount / 3);
+        DOM.statVerts.textContent = vCount.toLocaleString();
+        DOM.statTris.textContent = tCount.toLocaleString();
+
+        if (geo.boundingBox) {
+          const size = new THREE.Vector3();
+          geo.boundingBox.getSize(size);
+          DOM.statBounds.textContent = `${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)}`;
+        }
+      }
+
+      function rebuildMeshAndViewport() {
+        const newGeo = buildWatertightReliefGeometry();
+        if (reliefMesh) {
+          const prevGeo = reliefMesh.geometry;
+          reliefMesh.geometry = newGeo;
+          if (prevGeo) prevGeo.dispose();
+        }
+        STATE.activeGeometry = newGeo;
+        updateStatsDisplay(newGeo);
+      }
+
+      function rebuildAll() {
+        computeDepthField();
+        renderPreviewCanvases();
+        syncSourceTexture();
+        if (reliefMesh && STATE.viewMode === 'textured') {
+          applyViewMode('textured');
+        }
+        rebuildMeshAndViewport();
+      }
+
+      // =========================================================================
+      // 7. VERIFIED 3D FILE EXPORTERS (.OBJ, BINARY .STL, BINARY glTF 2.0 .GLB)
+      // =========================================================================
+      function exportOBJ() {
+        const geo = STATE.activeGeometry;
+        if (!geo || !geo.attributes.position || !geo.index) {
+          showToast('No mesh available to export.', 'warning');
+          return;
+        }
+
+        const pos = geo.attributes.position;
+        const norm = geo.attributes.normal;
+        const uv = geo.attributes.uv;
+        const idx = geo.index.array;
+
+        const out = [];
+        out.push('# DepthForge 3D Watertight Relief Wavefront OBJ');
+        out.push(`# Source: ${STATE.sourceName} | Segments: ${STATE.segments}`);
+        out.push('o DepthForge_Relief');
+
+        for (let i = 0; i < pos.count; i++) {
+          out.push(`v ${pos.getX(i).toFixed(6)} ${pos.getY(i).toFixed(6)} ${pos.getZ(i).toFixed(6)}`);
+        }
+
+        if (uv) {
+          for (let i = 0; i < uv.count; i++) {
+            out.push(`vt ${uv.getX(i).toFixed(6)} ${uv.getY(i).toFixed(6)}`);
+          }
+        }
+
+        if (norm) {
+          for (let i = 0; i < norm.count; i++) {
+            out.push(`vn ${norm.getX(i).toFixed(6)} ${norm.getY(i).toFixed(6)} ${norm.getZ(i).toFixed(6)}`);
+          }
+        }
+
+        for (let i = 0; i < idx.length; i += 3) {
+          const i0 = idx[i] + 1;
+          const i1 = idx[i + 1] + 1;
+          const i2 = idx[i + 2] + 1;
+          if (uv && norm) {
+            out.push(`f ${i0}/${i0}/${i0} ${i1}/${i1}/${i1} ${i2}/${i2}/${i2}`);
+          } else if (norm) {
+            out.push(`f ${i0}//${i0} ${i1}//${i1} ${i2}//${i2}`);
+          } else {
+            out.push(`f ${i0} ${i1} ${i2}`);
+          }
+        }
+
+        const blob = new Blob([out.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });
+        downloadBlob('depthforge_relief.obj', blob);
+        showToast('Exported depthforge_relief.obj', 'success');
+      }
+
+      function exportBinarySTL() {
+        const geo = STATE.activeGeometry;
+        if (!geo || !geo.attributes.position || !geo.index) {
+          showToast('No mesh available to export.', 'warning');
+          return;
+        }
+
+        const pos = geo.attributes.position;
+        const idx = geo.index.array;
+        const triCount = Math.floor(idx.length / 3);
+        const byteLength = 84 + triCount * 50;
+        const buffer = new ArrayBuffer(byteLength);
+        const view = new DataView(buffer);
+
+        // 80-byte ASCII header
+        const headerText = 'DepthForge 3D Binary STL Relief Mesh';
+        for (let i = 0; i < 80; i++) {
+          view.setUint8(i, i < headerText.length ? headerText.charCodeAt(i) : 32);
+        }
+
+        // uint32 triangle count
+        view.setUint32(80, triCount, true);
+
+        const vA = new THREE.Vector3();
+        const vB = new THREE.Vector3();
+        const vC = new THREE.Vector3();
+        const cb = new THREE.Vector3();
+        const ab = new THREE.Vector3();
+
+        let offset = 84;
+        for (let t = 0; t < triCount; t++) {
+          const i0 = idx[t * 3];
+          const i1 = idx[t * 3 + 1];
+          const i2 = idx[t * 3 + 2];
+
+          vA.fromBufferAttribute(pos, i0);
+          vB.fromBufferAttribute(pos, i1);
+          vC.fromBufferAttribute(pos, i2);
+
+          cb.subVectors(vC, vB);
+          ab.subVectors(vA, vB);
+          cb.cross(ab).normalize();
+
+          // Face normal (3 float32s)
+          view.setFloat32(offset, cb.x, true);
+          view.setFloat32(offset + 4, cb.y, true);
+          view.setFloat32(offset + 8, cb.z, true);
+
+          // Vertex 1
+          view.setFloat32(offset + 12, vA.x, true);
+          view.setFloat32(offset + 16, vA.y, true);
+          view.setFloat32(offset + 20, vA.z, true);
+
+          // Vertex 2
+          view.setFloat32(offset + 24, vB.x, true);
+          view.setFloat32(offset + 28, vB.y, true);
+          view.setFloat32(offset + 32, vB.z, true);
+
+          // Vertex 3
+          view.setFloat32(offset + 36, vC.x, true);
+          view.setFloat32(offset + 40, vC.y, true);
+          view.setFloat32(offset + 44, vC.z, true);
+
+          // Attribute byte count (uint16 = 0)
+          view.setUint16(offset + 48, 0, true);
+          offset += 50;
+        }
+
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        downloadBlob('depthforge_relief.stl', blob);
+        showToast(`Exported depthforge_relief.stl (${triCount.toLocaleString()} tris)`, 'success');
+      }
+
+      function padTo4Bytes(byteLength, padByte) {
+        const rem = byteLength % 4;
+        return rem === 0 ? 0 : 4 - rem;
+      }
+
+      function exportGLB() {
+        const geo = STATE.activeGeometry;
+        if (!geo || !geo.attributes.position || !geo.index) {
+          showToast('No mesh available to export.', 'warning');
+          return;
+        }
+
+        const posAttr = geo.attributes.position;
+        const normAttr = geo.attributes.normal;
+        const uvAttr = geo.attributes.uv;
+        const colAttr = geo.attributes.color;
+        const idxArray = geo.index.array;
+
+        // Compute min/max for POSITION accessor (required by glTF 2.0 spec)
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const y = posAttr.getY(i);
+          const z = posAttr.getZ(i);
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (z < minZ) minZ = z;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+          if (z > maxZ) maxZ = z;
+        }
+
+        const posBytes = new Uint8Array(posAttr.array.buffer, posAttr.array.byteOffset, posAttr.array.byteLength);
+        const normBytes = normAttr
+          ? new Uint8Array(normAttr.array.buffer, normAttr.array.byteOffset, normAttr.array.byteLength)
+          : new Uint8Array(0);
+        const uvBytes = uvAttr
+          ? new Uint8Array(uvAttr.array.buffer, uvAttr.array.byteOffset, uvAttr.array.byteLength)
+          : new Uint8Array(0);
+
+        // Use Uint32 indices if vertex count > 65535, otherwise Uint16
+        const useUint32 = posAttr.count > 65535;
+        const typedIdx = useUint32 ? new Uint32Array(idxArray.length) : new Uint16Array(idxArray.length);
+        for (let i = 0; i < idxArray.length; i++) typedIdx[i] = idxArray[i];
+        const idxBytes = new Uint8Array(typedIdx.buffer, typedIdx.byteOffset, typedIdx.byteLength);
+
+        // Optional PNG texture embedded in BIN chunk
+        let pngBytes = new Uint8Array(0);
+        if (STATE.sourceRGBA) {
+          const pngCanvas = document.createElement('canvas');
+          pngCanvas.width = MAP_RES;
+          pngCanvas.height = MAP_RES;
+          const pCtx = pngCanvas.getContext('2d');
+          pCtx.putImageData(new ImageData(new Uint8ClampedArray(STATE.sourceRGBA), MAP_RES, MAP_RES), 0, 0);
+          const dataUrl = pngCanvas.toDataURL('image/png');
+          const base64 = dataUrl.split(',')[1];
+          const binaryStr = atob(base64);
+          pngBytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            pngBytes[i] = binaryStr.charCodeAt(i);
+          }
+        }
+
+        // Pack bufferViews with 4-byte alignment
+        const chunks = [];
+        let binOffset = 0;
+
+        function appendBinChunk(u8) {
+          const start = binOffset;
+          chunks.push(u8);
+          binOffset += u8.byteLength;
+          const pad = padTo4Bytes(binOffset, 0);
+          if (pad > 0) {
+            chunks.push(new Uint8Array(pad));
+            binOffset += pad;
+          }
+          return { byteOffset: start, byteLength: u8.byteLength };
+        }
+
+        const idxViewInfo = appendBinChunk(idxBytes);
+        const posViewInfo = appendBinChunk(posBytes);
+        const normViewInfo = normBytes.byteLength > 0 ? appendBinChunk(normBytes) : null;
+        const uvViewInfo = uvBytes.byteLength > 0 ? appendBinChunk(uvBytes) : null;
+        const imgViewInfo = pngBytes.byteLength > 0 ? appendBinChunk(pngBytes) : null;
+
+        const bufferViews = [
+          {
+            buffer: 0,
+            byteOffset: idxViewInfo.byteOffset,
+            byteLength: idxViewInfo.byteLength,
+            target: 34963 // ELEMENT_ARRAY_BUFFER
+          },
+          {
+            buffer: 0,
+            byteOffset: posViewInfo.byteOffset,
+            byteLength: posViewInfo.byteLength,
+            target: 34962 // ARRAY_BUFFER
+          }
+        ];
+
+        const attributes = { POSITION: 1 };
+        const accessors = [
+          {
+            bufferView: 0,
+            componentType: useUint32 ? 5125 : 5123, // UNSIGNED_INT or UNSIGNED_SHORT
+            count: typedIdx.length,
+            type: 'SCALAR'
+          },
+          {
+            bufferView: 1,
+            componentType: 5126, // FLOAT
+            count: posAttr.count,
+            type: 'VEC3',
+            min: [minX, minY, minZ],
+            max: [maxX, maxY, maxZ]
+          }
+        ];
+
+        if (normViewInfo) {
+          const bvIdx = bufferViews.length;
+          bufferViews.push({
+            buffer: 0,
+            byteOffset: normViewInfo.byteOffset,
+            byteLength: normViewInfo.byteLength,
+            target: 34962
+          });
+          attributes.NORMAL = accessors.length;
+          accessors.push({
+            bufferView: bvIdx,
+            componentType: 5126,
+            count: normAttr.count,
+            type: 'VEC3'
+          });
+        }
+
+        if (uvViewInfo) {
+          const bvIdx = bufferViews.length;
+          bufferViews.push({
+            buffer: 0,
+            byteOffset: uvViewInfo.byteOffset,
+            byteLength: uvViewInfo.byteLength,
+            target: 34962
+          });
+          attributes.TEXCOORD_0 = accessors.length;
+          accessors.push({
+            bufferView: bvIdx,
+            componentType: 5126,
+            count: uvAttr.count,
+            type: 'VEC2'
+          });
+        }
+
+        const gltfJson = {
+          asset: {
+            version: '2.0',
+            generator: 'DepthForge 3D Studio'
+          },
+          scene: 0,
+          scenes: [{ nodes: [0] }],
+          nodes: [{ mesh: 0, name: 'DepthForge_Relief_Mesh' }],
+          meshes: [
+            {
+              name: 'DepthForge_Relief_Primitive',
+              primitives: [
+                {
+                  attributes,
+                  indices: 0,
+                  material: 0
+                }
+              ]
+            }
+          ],
+          materials: [
+            {
+              name: 'DepthForge_Material',
+              pbrMetallicRoughness: {
+                baseColorFactor: [1.0, 1.0, 1.0, 1.0],
+                metallicFactor: STATE.viewMode === 'clay' ? 0.04 : 0.08,
+                roughnessFactor: STATE.viewMode === 'clay' ? 0.78 : 0.52,
+                ...(imgViewInfo && STATE.viewMode === 'textured'
+                  ? { baseColorTexture: { index: 0 } }
+                  : {})
+              }
+            }
+          ],
+          buffers: [{ byteLength: binOffset }],
+          bufferViews,
+          accessors
+        };
+
+        if (imgViewInfo) {
+          const imgBvIdx = bufferViews.length;
+          bufferViews.push({
+            buffer: 0,
+            byteOffset: imgViewInfo.byteOffset,
+            byteLength: imgViewInfo.byteLength
+          });
+          gltfJson.images = [{ mimeType: 'image/png', bufferView: imgBvIdx }];
+          gltfJson.textures = [{ source: 0 }];
+        }
+
+        const jsonStr = JSON.stringify(gltfJson);
+        const encoder = new TextEncoder();
+        let jsonBytes = encoder.encode(jsonStr);
+        const jsonPad = padTo4Bytes(jsonBytes.byteLength, 0x20);
+        if (jsonPad > 0) {
+          const padded = new Uint8Array(jsonBytes.byteLength + jsonPad);
+          padded.set(jsonBytes);
+          padded.fill(0x20, jsonBytes.byteLength);
+          jsonBytes = padded;
+        }
+
+        const binChunkLen = binOffset;
+        const totalSize = 12 + 8 + jsonBytes.byteLength + 8 + binChunkLen;
+        const glbBuffer = new ArrayBuffer(totalSize);
+        const glbView = new DataView(glbBuffer);
+        const glbU8 = new Uint8Array(glbBuffer);
+
+        // GLB Header (12 bytes)
+        glbView.setUint32(0, 0x46546c67, true); // 'glTF'
+        glbView.setUint32(4, 2, true);          // version 2
+        glbView.setUint32(8, totalSize, true);
+
+        // JSON Chunk (8 bytes header + JSON)
+        glbView.setUint32(12, jsonBytes.byteLength, true);
+        glbView.setUint32(16, 0x4e4f534a, true); // 'JSON'
+        glbU8.set(jsonBytes, 20);
+
+        // BIN Chunk (8 bytes header + BIN)
+        const binHeaderPos = 20 + jsonBytes.byteLength;
+        glbView.setUint32(binHeaderPos, binChunkLen, true);
+        glbView.setUint32(binHeaderPos + 4, 0x004e4942, true); // 'BIN\0'
+
+        let cursor = binHeaderPos + 8;
+        for (const part of chunks) {
+          glbU8.set(part, cursor);
+          cursor += part.byteLength;
+        }
+
+        const blob = new Blob([glbBuffer], { type: 'model/gltf-binary' });
+        downloadBlob('depthforge_relief.glb', blob);
+        showToast('Exported binary glTF 2.0 depthforge_relief.glb', 'success');
+      }
+
+      // =========================================================================
+      // 8. UI EVENT BINDINGS & LIFECYCLE
+      // =========================================================================
+      function setRailCollapsed(collapsed) {
+        STATE.railCollapsed = collapsed;
+        if (collapsed) {
+          DOM.leftControlRail.classList.add('lg:hidden');
+          DOM.btnExpandRailDesktop.classList.remove('hidden');
+          DOM.btnExpandRailDesktop.classList.add('lg:inline-flex');
+        } else {
+          DOM.leftControlRail.classList.remove('lg:hidden');
+          DOM.btnExpandRailDesktop.classList.add('hidden');
+          DOM.btnExpandRailDesktop.classList.remove('lg:inline-flex');
+        }
+        setTimeout(onWindowResize, 80);
+      }
+
+      function bindEvents() {
+        // Mobile control rail drawer
+        document.getElementById('btnToggleRailMobile').addEventListener('click', () => {
+          DOM.leftControlRail.classList.toggle('-translate-x-full');
+        });
+
+        // Desktop collapse/expand rail
+        document.getElementById('btnCollapseRailDesktop').addEventListener('click', () => setRailCollapsed(true));
+        DOM.btnExpandRailDesktop.addEventListener('click', () => setRailCollapsed(false));
+
+        // File upload
+        DOM.imageFileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleUploadedImageFile(e.target.files[0]);
+            e.target.value = '';
+          }
+        });
+
+        // Drag and drop image
+        let dragCounter = 0;
+        window.addEventListener('dragenter', (e) => {
+          e.preventDefault();
+          dragCounter++;
+          DOM.dragOverlay.classList.remove('hidden');
+        });
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('dragleave', () => {
+          dragCounter = Math.max(0, dragCounter - 1);
+          if (dragCounter === 0) DOM.dragOverlay.classList.add('hidden');
+        });
+        window.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dragCounter = 0;
+          DOM.dragOverlay.classList.add('hidden');
+          const file = e.dataTransfer ? Array.from(e.dataTransfer.files).find((f) => f.type.startsWith('image/')) : null;
+          if (file) handleUploadedImageFile(file);
+        });
+
+        // Procedural presets
+        document.querySelectorAll('.preset-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const preset = btn.dataset.preset;
+            STATE.preset = preset;
+            document.querySelectorAll('.preset-btn').forEach((b) => {
+              const active = b.dataset.preset === preset;
+              b.classList.toggle('active', active);
+              b.classList.toggle('bg-sky-500/20', active);
+              b.classList.toggle('text-sky-300', active);
+              b.classList.toggle('border-sky-500/40', active);
+              b.classList.toggle('font-semibold', active);
+              b.classList.toggle('bg-slate-950/70', !active);
+              b.classList.toggle('text-slate-300', !active);
+              b.classList.toggle('border-slate-800', !active);
+              b.classList.toggle('font-medium', !active);
+            });
+            renderProceduralPreset(preset);
+            rebuildAll();
+          });
+        });
+
+        // Depth mode & invert
+        DOM.selectDepthMode.addEventListener('change', (e) => {
+          STATE.depthMode = e.target.value;
+          computeDepthField();
+          renderPreviewCanvases();
+          rebuildMeshAndViewport();
+        });
+
+        DOM.toggleInvertDepth.addEventListener('change', (e) => {
+          STATE.invertDepth = e.target.checked;
+          computeDepthField();
+          renderPreviewCanvases();
+          rebuildMeshAndViewport();
+        });
+
+        // Parameter sliders
+        DOM.sliderReliefScale.addEventListener('input', (e) => {
+          STATE.reliefScale = parseFloat(e.target.value);
+          DOM.valReliefScale.textContent = STATE.reliefScale.toFixed(2);
+          rebuildMeshAndViewport();
+        });
+
+        DOM.sliderPlinth.addEventListener('input', (e) => {
+          STATE.plinthThickness = parseFloat(e.target.value);
+          DOM.valPlinth.textContent = STATE.plinthThickness.toFixed(2);
+          rebuildMeshAndViewport();
+        });
+
+        DOM.sliderSegments.addEventListener('input', (e) => {
+          STATE.segments = parseInt(e.target.value, 10);
+          DOM.valSegments.textContent = STATE.segments.toString();
+          rebuildMeshAndViewport();
+        });
+
+        DOM.sliderBlur.addEventListener('input', (e) => {
+          STATE.blurRadius = parseFloat(e.target.value);
+          DOM.valBlur.textContent = STATE.blurRadius.toFixed(1);
+          computeDepthField();
+          renderPreviewCanvases();
+          rebuildMeshAndViewport();
+        });
+
+        DOM.sliderContrast.addEventListener('input', (e) => {
+          STATE.contrast = parseFloat(e.target.value);
+          DOM.valContrast.textContent = STATE.contrast.toFixed(2);
+          computeDepthField();
+          renderPreviewCanvases();
+          rebuildMeshAndViewport();
+        });
+
+        DOM.sliderGamma.addEventListener('input', (e) => {
+          STATE.gamma = parseFloat(e.target.value);
+          DOM.valGamma.textContent = STATE.gamma.toFixed(2);
+          computeDepthField();
+          renderPreviewCanvases();
+          rebuildMeshAndViewport();
+        });
+
+        // Reset parameters
+        document.getElementById('btnResetParams').addEventListener('click', () => {
+          STATE.depthMode = 'luminanceEdge';
+          STATE.invertDepth = false;
+          STATE.reliefScale = 0.55;
+          STATE.plinthThickness = 0.22;
+          STATE.segments = 144;
+          STATE.blurRadius = 1.5;
+          STATE.contrast = 1.15;
+          STATE.gamma = 1.0;
+
+          DOM.selectDepthMode.value = STATE.depthMode;
+          DOM.toggleInvertDepth.checked = false;
+          DOM.sliderReliefScale.value = '0.55';
+          DOM.valReliefScale.textContent = '0.55';
+          DOM.sliderPlinth.value = '0.22';
+          DOM.valPlinth.textContent = '0.22';
+          DOM.sliderSegments.value = '144';
+          DOM.valSegments.textContent = '144';
+          DOM.sliderBlur.value = '1.5';
+          DOM.valBlur.textContent = '1.5';
+          DOM.sliderContrast.value = '1.15';
+          DOM.valContrast.textContent = '1.15';
+          DOM.sliderGamma.value = '1.00';
+          DOM.valGamma.textContent = '1.00';
+
+          rebuildAll();
+          showToast('Reset relief & displacement settings', 'info');
+        });
+
+        // Viewport view modes
+        document.querySelectorAll('.viewmode-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const mode = btn.dataset.viewmode;
+            document.querySelectorAll('.viewmode-btn').forEach((b) => {
+              const active = b.dataset.viewmode === mode;
+              b.classList.toggle('active', active);
+              b.classList.toggle('bg-sky-500/20', active);
+              b.classList.toggle('text-sky-300', active);
+              b.classList.toggle('border-sky-500/40', active);
+              b.classList.toggle('text-slate-400', !active);
+              b.classList.toggle('border-transparent', !active);
+            });
+            applyViewMode(mode);
+          });
+        });
+
+        // Grid & camera reset
+        document.getElementById('btnToggleGrid').addEventListener('click', () => {
+          STATE.showGrid = !STATE.showGrid;
+          if (gridHelper) gridHelper.visible = STATE.showGrid;
+        });
+
+        document.getElementById('btnResetCamera').addEventListener('click', () => {
+          camera.position.set(1.85, 1.35, 2.75);
+          controls.target.set(0, 0, 0.1);
+          controls.update();
+        });
+
+        // Export buttons (top bar & rail)
+        document.getElementById('btnExportOBJTop').addEventListener('click', exportOBJ);
+        document.getElementById('btnExportOBJ').addEventListener('click', exportOBJ);
+        document.getElementById('btnExportGLBTop').addEventListener('click', exportGLB);
+        document.getElementById('btnExportGLB').addEventListener('click', exportGLB);
+        document.getElementById('btnExportSTLTop').addEventListener('click', exportBinarySTL);
+        document.getElementById('btnExportSTL').addEventListener('click', exportBinarySTL);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+          STATE.activeObjectURLs.forEach((u) => URL.revokeObjectURL(u));
+          STATE.activeObjectURLs.clear();
+          if (STATE.activeTexture) STATE.activeTexture.dispose();
+          if (STATE.activeGeometry) STATE.activeGeometry.dispose();
+          if (reliefMesh && reliefMesh.material) reliefMesh.material.dispose();
+          if (roomEnvRT) roomEnvRT.dispose();
+          if (renderer) renderer.dispose();
+        });
+      }
+
+      let rafId = null;
+      function animateLoop() {
+        rafId = requestAnimationFrame(animateLoop);
+        if (controls) controls.update();
+        if (renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+      }
+
+      window.onload = function () {
+        initThreeViewport();
+        bindEvents();
+        renderProceduralPreset(STATE.preset);
+        rebuildAll();
+        animateLoop();
+      };
+    })();
+  </script>
+</body>
+</html>
